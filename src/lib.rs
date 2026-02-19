@@ -31,15 +31,18 @@ impl<'d> Mpu6050<'d> {
         const CLKSEL: u8 = 0;
         self.write(PWR_MGMT_1_REG, 1 << CLKSEL).await;
 
-        // Set range of gyroscope (2000 degree/s)
+        // Set range of gyroscope (250 degree/s)
         const GYRO_CONFIG_REG: u8 = 27;
         const FS_SEL: u8 = 3;
-        self.write(GYRO_CONFIG_REG, 3 << FS_SEL).await;
+        self.write(GYRO_CONFIG_REG, 0 << FS_SEL).await;
 
         // Set range of accelerometer (2g)
+        // and DHPF to 5Hz
         const ACCEL_CONFIG: u8 = 28;
         const AFS_SEL: u8 = 3;
-        self.write(ACCEL_CONFIG, 0 << AFS_SEL).await;
+        const ACCEL_HPF: u8 = 0;
+        self.write(ACCEL_CONFIG, (0 << AFS_SEL) | (1 << ACCEL_HPF))
+            .await;
 
         // Set sample rate (125 Hz)
         const SMPRT_DIV_REG: u8 = 25;
@@ -71,7 +74,7 @@ impl<'d> Mpu6050<'d> {
         // Real values
         const G: f32 = 9.8067;
         const ACCEL_LSB_SENSITIVITY: f32 = 16384.0;
-        const GYRO_LSB_SENSITIVITY: f32 = 16.4;
+        const GYRO_LSB_SENSITIVITY: f32 = 131.0;
         let accel_x = accel_x as f32 * G / ACCEL_LSB_SENSITIVITY;
         let accel_y = accel_y as f32 * G / ACCEL_LSB_SENSITIVITY;
         let accel_z = accel_z as f32 * G / ACCEL_LSB_SENSITIVITY;
