@@ -24,7 +24,7 @@ impl<'d> Mpu6050<'d> {
 
     pub async fn init(&mut self) {
         // Initialization process is based on:
-        // https://docs.espressif.com/projects/espressif-esp-drone/en/latest/drivers.html        const PWR_MGMT_1_REG: u8 = 107;
+        // https://docs.espressif.com/projects/espressif-esp-drone/en/latest/drivers.html
 
         // Set X axis gyroscope clock reference
         const PWR_MGMT_1_REG: u8 = 107;
