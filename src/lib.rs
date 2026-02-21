@@ -5,6 +5,22 @@ use esp_hal::{Async, i2c::master::I2c};
 pub struct Mpu6050<'d> {
     i2c: I2c<'d, Async>,
     dev_addr: u8,
+    accel_x_offset: i16,
+    accel_y_offset: i16,
+    accel_z_offset: i16,
+    gyro_x_offset: i16,
+    gyro_y_offset: i16,
+    gyro_z_offset: i16,
+}
+
+pub struct RawMeasurements {
+    pub accel_x: i16,
+    pub accel_y: i16,
+    pub accel_z: i16,
+    pub temp: i16,
+    pub gyro_x: i16,
+    pub gyro_y: i16,
+    pub gyro_z: i16,
 }
 
 pub struct Measurements {
@@ -19,7 +35,16 @@ pub struct Measurements {
 
 impl<'d> Mpu6050<'d> {
     pub fn new(i2c: I2c<'d, Async>, dev_addr: u8) -> Self {
-        Self { i2c, dev_addr }
+        Self {
+            i2c,
+            dev_addr,
+            accel_x_offset: 0,
+            accel_y_offset: 0,
+            accel_z_offset: 0,
+            gyro_x_offset: 0,
+            gyro_y_offset: 0,
+            gyro_z_offset: 0,
+        }
     }
 
     pub async fn init(&mut self) {
@@ -54,7 +79,24 @@ impl<'d> Mpu6050<'d> {
         self.write(CONFIG_REG, 6 << DLPF_CFG).await;
     }
 
-    pub async fn get_measurements(&mut self) -> Measurements {
+    pub fn set_offsets(
+        &mut self,
+        accel_x_offset: i16,
+        accel_y_offset: i16,
+        accel_z_offset: i16,
+        gyro_x_offset: i16,
+        gyro_y_offset: i16,
+        gyro_z_offset: i16,
+    ) {
+        self.accel_x_offset = accel_x_offset;
+        self.accel_y_offset = accel_y_offset;
+        self.accel_z_offset = accel_z_offset;
+        self.gyro_x_offset = gyro_x_offset;
+        self.gyro_y_offset = gyro_y_offset;
+        self.gyro_z_offset = gyro_z_offset;
+    }
+
+    pub async fn get_raw_measurements(&mut self) -> RawMeasurements {
         const START_REG_ADDR: u8 = 59;
         let mut buffer = [0; 14];
         self.i2c
@@ -71,17 +113,29 @@ impl<'d> Mpu6050<'d> {
         let gyro_y = i16::from_be_bytes([buffer[10], buffer[11]]);
         let gyro_z = i16::from_be_bytes([buffer[12], buffer[13]]);
 
-        // Real values
+        RawMeasurements {
+            accel_x,
+            accel_y,
+            accel_z,
+            temp,
+            gyro_x,
+            gyro_y,
+            gyro_z,
+        }
+    }
+
+    pub async fn get_measurements(&mut self) -> Measurements {
+        let raw_meas = self.get_raw_measurements().await;
         const G: f32 = 9.8067;
         const ACCEL_LSB_SENSITIVITY: f32 = 16384.0;
         const GYRO_LSB_SENSITIVITY: f32 = 131.0;
-        let accel_x = accel_x as f32 * G / ACCEL_LSB_SENSITIVITY;
-        let accel_y = accel_y as f32 * G / ACCEL_LSB_SENSITIVITY;
-        let accel_z = accel_z as f32 * G / ACCEL_LSB_SENSITIVITY;
-        let temp = temp as f32 / 340.0 + 36.53;
-        let gyro_x = gyro_x as f32 / GYRO_LSB_SENSITIVITY;
-        let gyro_y = gyro_y as f32 / GYRO_LSB_SENSITIVITY;
-        let gyro_z = gyro_z as f32 / GYRO_LSB_SENSITIVITY;
+        let accel_x = (raw_meas.accel_x - self.accel_x_offset) as f32 * G / ACCEL_LSB_SENSITIVITY;
+        let accel_y = (raw_meas.accel_y - self.accel_y_offset) as f32 * G / ACCEL_LSB_SENSITIVITY;
+        let accel_z = (raw_meas.accel_z - self.accel_z_offset) as f32 * G / ACCEL_LSB_SENSITIVITY;
+        let temp = raw_meas.temp as f32 / 340.0 + 36.53;
+        let gyro_x = (raw_meas.gyro_x - self.gyro_x_offset) as f32 / GYRO_LSB_SENSITIVITY;
+        let gyro_y = (raw_meas.gyro_y - self.gyro_y_offset) as f32 / GYRO_LSB_SENSITIVITY;
+        let gyro_z = (raw_meas.gyro_z - self.gyro_z_offset) as f32 / GYRO_LSB_SENSITIVITY;
 
         Measurements {
             accel_x,
